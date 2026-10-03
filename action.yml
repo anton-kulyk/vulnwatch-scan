@@ -1,0 +1,83 @@
+name: 'VulnWatch Scan'
+description: >-
+  Run a VulnWatch security scan against a live website URL directly from your
+  GitHub Actions workflow. Submits the scan to the VulnWatch API, waits for
+  completion, reports finding counts and risk score, and optionally fails the
+  job when findings meet a configured severity threshold.
+author: vulnwatch
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  url:
+    description: >-
+      The absolute URL of the website to scan, e.g. https://example.com/.
+    required: true
+  scan_type:
+    description: 'Scan profile to run: standard, deep, or quick.'
+    required: false
+    default: 'standard'
+  api_token:
+    description: >-
+      VulnWatch API token. Required to run a full (paid/unlocked) scan and to
+      read the complete report with all findings. Without it a guest preview
+      scan is submitted. Store it as a GitHub Actions secret.
+    required: false
+    default: ''
+  api_base_url:
+    description: 'Base URL of the VulnWatch API.'
+    required: false
+    default: 'https://app.vulnwatch.tech/api'
+  fail_on:
+    description: >-
+      Highest finding severity that is allowed before the action fails the
+      build. One of: none, critical, high, medium, low, info. Example:
+      fail_on=high fails the job if any high or critical finding is present.
+    required: false
+    default: 'critical'
+  timeout_seconds:
+    description: 'Max seconds to wait for the scan to complete.'
+    required: false
+    default: '900'
+  report_artifact:
+    description: >-
+      When true, save the raw report JSON into GITHUB_WORKSPACE under
+      vulnwatch-report/<uuid>.json so it can be uploaded as an artifact.
+    required: false
+    default: 'true'
+
+outputs:
+  check_uuid:
+    description: 'UUID of the submitted scan.'
+  url:
+    description: 'The scanned URL.'
+  findings_count:
+    description: 'Total number of reported findings.'
+  critical_count:
+    description: 'Number of critical-severity findings.'
+  high_count:
+    description: 'Number of high-severity findings.'
+  medium_count:
+    description: 'Number of medium-severity findings.'
+  low_count:
+    description: 'Number of low-severity findings.'
+  info_count:
+    description: 'Number of info-severity findings.'
+  risk_score:
+    description: 'Overall risk score (0-100).'
+  report_url:
+    description: 'Web URL to view the full report.'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    INPUT_URL: ${{ inputs.url }}
+    INPUT_SCAN_TYPE: ${{ inputs.scan_type }}
+    INPUT_API_TOKEN: ${{ inputs.api_token }}
+    INPUT_API_BASE_URL: ${{ inputs.api_base_url }}
+    INPUT_FAIL_ON: ${{ inputs.fail_on }}
+    INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+    INPUT_REPORT_ARTIFACT: ${{ inputs.report_artifact }}

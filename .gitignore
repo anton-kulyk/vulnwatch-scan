@@ -1,0 +1,8 @@
+# Test artifacts
+mock_api.py
+/tmp/*.json
+*.report.json
+
+# OS / editor
+.DS_Store
+*.swp
