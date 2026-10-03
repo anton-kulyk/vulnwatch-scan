@@ -16,20 +16,28 @@ inputs:
       The absolute URL of the website to scan, e.g. https://example.com/.
     required: true
   scan_type:
-    description: 'Scan profile to run: standard, deep, or quick.'
+    description: 'Scan profile to run: basic, standard, full, or custom.'
     required: false
     default: 'standard'
-  api_token:
+  tools:
     description: >-
-      VulnWatch API token. Required to run a full (paid/unlocked) scan and to
-      read the complete report with all findings. Without it a guest preview
-      scan is submitted. Store it as a GitHub Actions secret.
+      Comma-separated external scanners to run, e.g. "nmap,nuclei,zap". Valid
+      values: nmap, nuclei, zap, sqlmap, wpscan. Only tools your token is
+      granted are actually run. Omit to run all scanners your token allows.
     required: false
     default: ''
-  api_base_url:
-    description: 'Base URL of the VulnWatch API.'
+  ai_analyst:
+    description: >-
+      When true, enable the AI analyst on this scan (requires the matching
+      token ability). Defaults to the account/global setting.
     required: false
-    default: 'https://app.vulnwatch.tech/api'
+    default: ''
+  api_token:
+    description: >-
+      VulnWatch API token. Required — this endpoint has no guest path. Create a
+      token with the "start scans" ability in the dashboard (Settings → API
+      tokens) and store it as a GitHub Actions secret, e.g. VULNWATCH_API_TOKEN.
+    required: true
   fail_on:
     description: >-
       Highest finding severity that is allowed before the action fails the
@@ -76,8 +84,9 @@ runs:
   env:
     INPUT_URL: ${{ inputs.url }}
     INPUT_SCAN_TYPE: ${{ inputs.scan_type }}
+    INPUT_TOOLS: ${{ inputs.tools }}
+    INPUT_AI_ANALYST: ${{ inputs.ai_analyst }}
     INPUT_API_TOKEN: ${{ inputs.api_token }}
-    INPUT_API_BASE_URL: ${{ inputs.api_base_url }}
     INPUT_FAIL_ON: ${{ inputs.fail_on }}
     INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
     INPUT_REPORT_ARTIFACT: ${{ inputs.report_artifact }}

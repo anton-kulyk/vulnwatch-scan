@@ -2,8 +2,8 @@
 #
 # VulnWatch Scan GitHub Action entrypoint.
 #
-# Drives the VulnWatch scan API:
-#   1. POST    {base}/scan                  -> submit scan, returns check_uuid
+# Drives the VulnWatch scan API (token-authenticated action scan):
+#   1. POST    {base}/scan/action           -> submit scan, returns check_uuid
 #   2. GET     {base}/scan/{uuid}/status    -> poll until is_completed | is_error
 #   3. GET     {base}/scan/report/{uuid}    -> fetch report payload
 #   4. Evaluate findings severities, fail on threshold, emit outputs.
@@ -28,8 +28,18 @@ emit_output() { # name value
 # ---------------------------------------------------------------------------
 URL="${INPUT_URL:-}"
 SCAN_TYPE="${INPUT_SCAN_TYPE:-standard}"
+TOOLS="${INPUT_TOOLS:-}"
+AI_ANALYST="${INPUT_AI_ANALYST:-}"
 API_TOKEN="${INPUT_API_TOKEN:-}"
-BASE_URL="${INPUT_API_BASE_URL:-https://app.vulnwatch.tech/api}"
+# ---------------------------------------------------------------------------
+# Base API URL.
+#
+# Hard-coded to the production API so end users never need to set
+# INPUT_API_BASE_URL. A hidden VULNWATCH_API_BASE_URL environment variable may
+# override it (used only for staging/mock E2E testing) — it is intentionally
+# NOT a documented action input.
+# ---------------------------------------------------------------------------
+BASE_URL="${VULNWATCH_API_BASE_URL:-https://app.vulnwatch.tech/api}"
 FAIL_ON="${INPUT_FAIL_ON:-critical}"
 TIMEOUT="${INPUT_TIMEOUT_SECONDS:-900}"
 REPORT_ARTIFACT="${INPUT_REPORT_ARTIFACT:-true}"
@@ -38,6 +48,11 @@ BASE_URL="${BASE_URL%/}"
 
 if [[ -z "$URL" ]]; then
   echo "::error::Missing required input 'url'"
+  exit 1
+fi
+
+if [[ -z "$API_TOKEN" ]]; then
+  echo "::error::Missing required input 'api_token'. Create an API token in the VulnWatch dashboard (Settings → API tokens) and pass it as a secret."
   exit 1
 fi
 
@@ -68,9 +83,10 @@ emit_summary() { # line
 echo "==> VulnWatch Scan"
 echo "    URL:      $URL"
 echo "    ScanType: $SCAN_TYPE"
+echo "    Tools:    ${TOOLS:-all allowed}"
+[[ -n "$AI_ANALYST" ]] && echo "    AI analyst: $AI_ANALYST"
 echo "    API:      $BASE_URL"
-[[ -n "$API_TOKEN" ]] && echo "    Auth:     authenticated (token provided)"
-[[ -z "$API_TOKEN" ]] && echo "    Auth:     guest (no token — limited preview scan)"
+echo "    Auth:     authenticated (API token)"
 
 # ---------------------------------------------------------------------------
 # 1. Submit scan
@@ -80,33 +96,42 @@ echo "==> Submitting scan..."
 BODY_FILE=$(mktemp)
 SUBMIT_PAYLOAD=$(mktemp)
 
-# Build JSON body safely with jq
-if [[ -n "$API_TOKEN" ]]; then
-  jq -n \
-    --arg url "$URL" \
-    --arg scan_type "$SCAN_TYPE" \
-    --arg notify_email "" \
-    '{url: $url, scan_type: $scan_type, notify_email: $notify_email}' > "$BODY_FILE"
+# Parse comma-separated tools into a JSON array (empty string -> none sent).
+JQ_TOOLS=$(python3 - "$TOOLS" <<'PY'
+import json, sys
+raw = sys.argv[1].strip()
+out = [t.strip() for t in raw.split(",") if t.strip()] if raw else []
+print(json.dumps(out))
+PY
+)
+
+JQ_ARGS=(--arg url "$URL" --arg scan_type "$SCAN_TYPE" --argjson tools "$JQ_TOOLS")
+if [[ -n "$AI_ANALYST" ]]; then
+  JQ_ARGS+=(--argjson ai_analyst "$([ "$AI_ANALYST" = "true" ] && echo true || echo false)")
+  jq -n "${JQ_ARGS[@]}" '{url: $url, scan_type: $scan_type, tools: $tools, ai_analyst: $ai_analyst}' > "$BODY_FILE"
 else
-  jq -n \
-    --arg url "$URL" \
-    --arg scan_type "$SCAN_TYPE" \
-    '{url: $url, scan_type: $scan_type}' > "$BODY_FILE"
+  jq -n "${JQ_ARGS[@]}" '{url: $url, scan_type: $scan_type, tools: $tools}' > "$BODY_FILE"
 fi
 
 HTTP_CODE=$(curl -sS -o "$SUBMIT_PAYLOAD" -w '%{http_code}' \
-  -X POST "${BASE_URL}/scan" \
-  ${API_TOKEN:+-H "Authorization: Bearer $API_TOKEN"} \
+  -X POST "${BASE_URL}/scan/action" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
   --data-binary @"$BODY_FILE")
 
 CHECK_UUID=$(jq -r '.data.result.check_uuid // empty' "$SUBMIT_PAYLOAD" 2>/dev/null)
 
-if [[ "$HTTP_CODE" != "200" ]] || [[ -z "$CHECK_UUID" ]]; then
+if [[ "$HTTP_CODE" != "200" ]] && [[ "$HTTP_CODE" != "201" ]]; then
   echo "::error::Scan submission failed (HTTP $HTTP_CODE)"
   jq -c '.' "$SUBMIT_PAYLOAD" 2>/dev/null | head -c 2000 || cat "$SUBMIT_PAYLOAD"
   echo ""
+  exit 1
+fi
+
+if [[ -z "$CHECK_UUID" ]]; then
+  echo "::error::Scan submission returned no check_uuid"
+  jq -c '.' "$SUBMIT_PAYLOAD" 2>/dev/null | head -c 2000 || cat "$SUBMIT_PAYLOAD"
   exit 1
 fi
 

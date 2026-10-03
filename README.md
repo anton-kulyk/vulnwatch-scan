@@ -32,11 +32,12 @@ jobs:
 | Input               | Required | Default                        | Description |
 |---------------------|:--------:|--------------------------------|-------------|
 | `url`               | **yes**  | —                              | Absolute URL to scan (e.g. `https://example.com/`). |
-| `api_token`         | no       | —                              | VulnWatch API token. **Recommended.** Without it only a *guest preview* scan runs (1 per day, limited findings). Store as a secret: `VULNWATCH_API_TOKEN`. |
-| `scan_type`         | no       | `standard`                     | `standard`, `deep`, or `quick`. |
-| `api_base_url`      | no       | `https://app.vulnwatch.tech/api` | Override for custom deployments. |
+| `api_token`         | **yes**  | —                              | VulnWatch API token. Create it in the dashboard (Settings → API tokens) with the *start scans* ability, then store as a secret: `VULNWATCH_API_TOKEN`. There is no guest path on this endpoint. |
+| `scan_type`         | no       | `standard`                     | Scan profile: `basic`, `standard`, `full`, or `custom`. |
+| `tools`             | no       | (all allowed)                  | Comma-separated external scanners to run: `nmap`, `nuclei`, `zap`, `sqlmap`, `wpscan`. Only tools your token grants are actually run. Omit to use every tool the token allows. |
+| `ai_analyst`        | no       | (account default)              | `true` to enable the AI analyst on this scan (requires the matching token ability). |
 | `fail_on`           | no       | `critical`                     | Highest allowed severity before the job fails: `none`, `critical`, `high`, `medium`, `low`, `info`. `high` fails on any high or critical finding. |
-| `timeout_seconds`   | no       | `900`                          | Max time (s) to wait for completion. Standard scans take ~15 min. |
+| `timeout_seconds`   | no       | `900`                          | Max time (s) to wait for completion. |
 | `report_artifact`   | no       | `true`                         | Save raw report JSON under `vulnwatch-report/<uuid>.json`. |
 
 ## Outputs
@@ -64,14 +65,23 @@ jobs:
 The action also writes a **step summary** table (job summary) with the severity
 breakdown so you can see results directly in the run page.
 
-## Notes on tokens and guest scans
+## Notes on the API token
 
-- **Without a token:** VulnWatch allows only **one guest scan per day** and the
-  reported findings are a limited preview. The daily limit returns a clean
-  GitHub error (`guest_scan_limit`).
-- **With a token:** you get full reports (all findings, complete severity
-  counts, risk score) and a meaningful `fail_on` gate. This is the intended
-  production use.
+- This endpoint is **token-authenticated only** — there is no guest path. The
+  action fails fast if `api_token` is missing.
+- Create a token in the VulnWatch dashboard (**Settings → API tokens**). Grant
+  the *start scans* ability (plus *AI analyst* if you want to use
+  `ai_analyst: true`). Only tools your token explicitly allows are ever run by
+  the API — the `tools` input can request them, but the token grants final
+  permission.
+- Store the token as a GitHub Actions secret, e.g. `VULNWATCH_API_TOKEN`, and
+  reference it with `${{ secrets.VULNWATCH_API_TOKEN }}`.
+
+## Tools
+
+`tools` controls which external scanners run: `nmap`, `nuclei`, `zap`,
+`sqlmap`, `wpscan`. A token that does not grant a requested tool silently skips
+it; omit `tools` entirely to run every scanner the token allows.
 
 ## Development
 
@@ -79,7 +89,8 @@ breakdown so you can see results directly in the run page.
 docker build -t vulnwatch-scan:test .
 docker run --rm \
   -e INPUT_URL="https://example.com/" \
-  -e INPUT_API_BASE_URL="https://app.vulnwatch.tech/api" \
+  -e INPUT_API_TOKEN="$VULNWATCH_API_TOKEN" \
+  -e INPUT_TOOLS="nmap,nuclei" \
   -e INPUT_FAIL_ON="critical" \
   vulnwatch-scan:test
 ```
