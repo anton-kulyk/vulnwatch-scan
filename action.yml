@@ -38,10 +38,6 @@ inputs:
       token with the "start scans" ability in the dashboard (Settings → API
       tokens) and store it as a GitHub Actions secret, e.g. VULNWATCH_API_TOKEN.
     required: true
-  api_base_url:
-    description: 'Base URL of the VulnWatch API.'
-    required: false
-    default: 'https://app.vulnwatch.tech/api'
   fail_on:
     description: >-
       Highest finding severity that is allowed before the action fails the
@@ -91,7 +87,6 @@ runs:
     INPUT_TOOLS: ${{ inputs.tools }}
     INPUT_AI_ANALYST: ${{ inputs.ai_analyst }}
     INPUT_API_TOKEN: ${{ inputs.api_token }}
-    INPUT_API_BASE_URL: ${{ inputs.api_base_url }}
     INPUT_FAIL_ON: ${{ inputs.fail_on }}
     INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
     INPUT_REPORT_ARTIFACT: ${{ inputs.report_artifact }}

@@ -36,7 +36,6 @@ jobs:
 | `scan_type`         | no       | `standard`                     | Scan profile: `basic`, `standard`, `full`, or `custom`. |
 | `tools`             | no       | (all allowed)                  | Comma-separated external scanners to run: `nmap`, `nuclei`, `zap`, `sqlmap`, `wpscan`. Only tools your token grants are actually run. Omit to use every tool the token allows. |
 | `ai_analyst`        | no       | (account default)              | `true` to enable the AI analyst on this scan (requires the matching token ability). |
-| `api_base_url`      | no       | `https://app.vulnwatch.tech/api` | Override for custom deployments. |
 | `fail_on`           | no       | `critical`                     | Highest allowed severity before the job fails: `none`, `critical`, `high`, `medium`, `low`, `info`. `high` fails on any high or critical finding. |
 | `timeout_seconds`   | no       | `900`                          | Max time (s) to wait for completion. |
 | `report_artifact`   | no       | `true`                         | Save raw report JSON under `vulnwatch-report/<uuid>.json`. |
@@ -92,7 +91,6 @@ docker run --rm \
   -e INPUT_URL="https://example.com/" \
   -e INPUT_API_TOKEN="$VULNWATCH_API_TOKEN" \
   -e INPUT_TOOLS="nmap,nuclei" \
-  -e INPUT_API_BASE_URL="https://app.vulnwatch.tech/api" \
   -e INPUT_FAIL_ON="critical" \
   vulnwatch-scan:test
 ```

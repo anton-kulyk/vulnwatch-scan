@@ -31,7 +31,15 @@ SCAN_TYPE="${INPUT_SCAN_TYPE:-standard}"
 TOOLS="${INPUT_TOOLS:-}"
 AI_ANALYST="${INPUT_AI_ANALYST:-}"
 API_TOKEN="${INPUT_API_TOKEN:-}"
-BASE_URL="${INPUT_API_BASE_URL:-https://app.vulnwatch.tech/api}"
+# ---------------------------------------------------------------------------
+# Base API URL.
+#
+# Hard-coded to the production API so end users never need to set
+# INPUT_API_BASE_URL. A hidden VULNWATCH_API_BASE_URL environment variable may
+# override it (used only for staging/mock E2E testing) — it is intentionally
+# NOT a documented action input.
+# ---------------------------------------------------------------------------
+BASE_URL="${VULNWATCH_API_BASE_URL:-https://app.vulnwatch.tech/api}"
 FAIL_ON="${INPUT_FAIL_ON:-critical}"
 TIMEOUT="${INPUT_TIMEOUT_SECONDS:-900}"
 REPORT_ARTIFACT="${INPUT_REPORT_ARTIFACT:-true}"
